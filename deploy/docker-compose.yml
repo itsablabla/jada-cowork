@@ -1,0 +1,22 @@
+services:
+  aionui:
+    build:
+      context: ./repo
+      dockerfile: Dockerfile
+    container_name: aionui
+    restart: unless-stopped
+    ports:
+      - "4000:3000"
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - ALLOW_REMOTE=true
+      - DATA_DIR=/data
+      - AIONUI_ALLOWED_ORIGINS=https://aionui.garzaos.cloud,http://72.62.86.63:4000
+      - SERVER_BASE_URL=https://aionui.garzaos.cloud
+    volumes:
+      - aionui_data:/data
+
+volumes:
+  aionui_data:
+    driver: local
