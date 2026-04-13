@@ -169,7 +169,8 @@ export function getCookieOptions(): {
 export const SECURITY_CONFIG = {
   HEADERS: {
     // 防点击劫持策略（Clickjacking protection）
-    FRAME_OPTIONS: 'DENY',
+    // Override with AIONUI_FRAME_OPTIONS env var (e.g. 'SAMEORIGIN') for iframe embedding
+    FRAME_OPTIONS: (process.env.AIONUI_FRAME_OPTIONS || 'DENY') as string,
     // 禁止 MIME 嗅探（No MIME sniffing）
     CONTENT_TYPE_OPTIONS: 'nosniff',
     // XSS 保护策略（XSS protection header）
