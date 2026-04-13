@@ -457,14 +457,17 @@ export function registerAuthRoutes(app: Express): void {
     // Generate a random state parameter to prevent CSRF
     const state = crypto.randomBytes(16).toString('hex');
 
-    // Store state in a short-lived cookie for verification on callback
-    // Let getCookieOptions() decide sameSite — it returns 'none' in iframe mode
-    // (AIONUI_FRAME_ANCESTORS set) and 'lax' in regular remote mode.
-    // Hardcoding 'lax' breaks iframe SSO because browsers won't send
-    // SameSite=Lax cookies on cross-site redirects within iframes.
+    // Store state in a short-lived cookie for verification on callback.
+    // getCookieOptions() returns 'none' in iframe mode, 'lax' in remote HTTP,
+    // but 'strict' in remote HTTPS without iframe — which breaks OAuth redirects
+    // because browsers don't send SameSite=Strict cookies on cross-site navigations.
+    // Override: ensure at least 'lax' (needed for OAuth redirect), keep 'none' for iframe.
+    const cookieOpts = getCookieOptions();
+    const ssoCookieSameSite = cookieOpts.sameSite === 'none' ? 'none' : 'lax';
     res.cookie('nc_sso_state', state, {
       httpOnly: true,
-      ...getCookieOptions(),
+      ...cookieOpts,
+      sameSite: ssoCookieSameSite,
       maxAge: 5 * 60 * 1000, // 5 minutes
     });
 
