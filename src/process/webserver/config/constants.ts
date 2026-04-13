@@ -154,14 +154,20 @@ export function getCookieOptions(): {
   const isHttps =
     process.env.AIONUI_HTTPS === 'true' || (process.env.NODE_ENV === 'production' && process.env.HTTPS === 'true');
 
+  // Cross-origin iframe embedding requires SameSite=None + Secure (HTTPS mandatory)
+  // Without this, browsers block cookies in third-party iframe contexts (Chrome 80+)
+  const isIframeEmbed = !!process.env.AIONUI_FRAME_ANCESTORS;
+
   return {
     httpOnly: AUTH_CONFIG.COOKIE.OPTIONS.httpOnly,
     // HTTP 环境下 secure=false，允许 cookie 在非 HTTPS 连接中工作
     // In HTTP environment secure=false, allows cookies to work over non-HTTPS connections
-    secure: isHttps,
+    // Iframe embedding forces secure=true (SameSite=None requires Secure flag)
+    secure: isIframeEmbed || isHttps,
     // 远程 HTTP 模式需要 lax 以支持跨站请求（从不同 IP 访问）
     // Remote HTTP mode needs 'lax' to support cross-site requests (access from different IPs)
-    sameSite: SERVER_CONFIG.isRemoteMode && !isHttps ? 'lax' : AUTH_CONFIG.COOKIE.OPTIONS.sameSite,
+    // Iframe embedding requires 'none' for cross-origin cookie delivery
+    sameSite: isIframeEmbed ? 'none' : SERVER_CONFIG.isRemoteMode && !isHttps ? 'lax' : AUTH_CONFIG.COOKIE.OPTIONS.sameSite,
   };
 }
 
@@ -190,8 +196,9 @@ export const SECURITY_CONFIG = {
     TOKEN_LENGTH: 32,
     COOKIE_OPTIONS: {
       httpOnly: false,
-      sameSite: 'strict' as const,
-      secure: false,
+      // Iframe embedding requires SameSite=None + Secure for CSRF tokens too
+      sameSite: (process.env.AIONUI_FRAME_ANCESTORS ? 'none' : 'strict') as 'strict' | 'none',
+      secure: !!process.env.AIONUI_FRAME_ANCESTORS,
       path: '/',
     },
   },
