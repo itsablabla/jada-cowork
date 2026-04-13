@@ -47,6 +47,28 @@ const LoginPage: React.FC = () => {
   const passwordRef = useRef<HTMLInputElement | null>(null);
   const messageTimer = useRef<number | undefined>(undefined);
 
+  // Auto-redirect to Nextcloud SSO when loaded inside an iframe
+  useEffect(() => {
+    let isInIframe = false;
+    try {
+      isInIframe = window.self !== window.top;
+    } catch {
+      // Cross-origin iframe — window.top access throws SecurityError
+      isInIframe = true;
+    }
+    if (isInIframe && status !== 'authenticated') {
+      // Prevent redirect loop: only redirect if we haven't tried SSO recently
+      const ssoAttemptKey = '__jada_sso_attempted';
+      const lastAttempt = sessionStorage.getItem(ssoAttemptKey);
+      const now = Date.now();
+      if (!lastAttempt || now - Number(lastAttempt) > 30000) {
+        sessionStorage.setItem(ssoAttemptKey, String(now));
+        window.location.href = '/api/auth/nextcloud-sso';
+        return;
+      }
+    }
+  }, [status]);
+
   useEffect(() => {
     document.body.classList.add('login-page-active');
     return () => {
