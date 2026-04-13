@@ -56,7 +56,7 @@ const LoginPage: React.FC = () => {
       // Cross-origin iframe — window.top access throws SecurityError
       isInIframe = true;
     }
-    if (isInIframe && status !== 'authenticated') {
+    if (isInIframe && status === 'unauthenticated') {
       // Prevent redirect loop: only redirect if we haven't tried SSO recently
       const ssoAttemptKey = '__jada_sso_attempted';
       const lastAttempt = sessionStorage.getItem(ssoAttemptKey);
