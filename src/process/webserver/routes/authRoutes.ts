@@ -458,10 +458,13 @@ export function registerAuthRoutes(app: Express): void {
     const state = crypto.randomBytes(16).toString('hex');
 
     // Store state in a short-lived cookie for verification on callback
+    // Let getCookieOptions() decide sameSite — it returns 'none' in iframe mode
+    // (AIONUI_FRAME_ANCESTORS set) and 'lax' in regular remote mode.
+    // Hardcoding 'lax' breaks iframe SSO because browsers won't send
+    // SameSite=Lax cookies on cross-site redirects within iframes.
     res.cookie('nc_sso_state', state, {
       httpOnly: true,
       ...getCookieOptions(),
-      sameSite: 'lax', // Must be 'lax' (not 'strict') for cross-site OAuth2 redirect
       maxAge: 5 * 60 * 1000, // 5 minutes
     });
 
