@@ -451,7 +451,7 @@ export function registerAuthRoutes(app: Express): void {
       return;
     }
 
-    const baseUrl = process.env.SERVER_BASE_URL || `${req.protocol}://${req.get('host')}`;
+    const baseUrl = (process.env.SERVER_BASE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
     const redirectUri = `${baseUrl}/api/auth/nextcloud-callback`;
 
     // Generate a random state parameter to prevent CSRF
@@ -520,7 +520,7 @@ export function registerAuthRoutes(app: Express): void {
     res.clearCookie('nc_sso_state', { httpOnly: true, ...clearCookieOpts, sameSite: clearSameSite });
 
     try {
-      const baseUrl = process.env.SERVER_BASE_URL || `${req.protocol}://${req.get('host')}`;
+      const baseUrl = (process.env.SERVER_BASE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
       const redirectUri = `${baseUrl}/api/auth/nextcloud-callback`;
 
       console.log('[SSO] Exchanging code for token, redirect_uri:', redirectUri);
