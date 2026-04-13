@@ -1,7 +1,7 @@
 {
-  "name": "AionUi",
-  "short_name": "AionUi",
-  "description": "AionUi WebUI for mobile and desktop browsers.",
+  "name": "Jada Cowork",
+  "short_name": "Jada Cowork",
+  "description": "Jada Cowork — AI coworking platform for Nextcloud.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

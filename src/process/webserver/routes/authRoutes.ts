@@ -5,6 +5,7 @@
  */
 
 import type { Express, Request, Response } from 'express';
+import crypto from 'crypto';
 import { AuthService } from '@process/webserver/auth/service/AuthService';
 import { AuthMiddleware } from '@process/webserver/auth/middleware/AuthMiddleware';
 import { UserRepository } from '@process/webserver/auth/repository/UserRepository';
@@ -25,7 +26,7 @@ const QR_LOGIN_PAGE_HTML = `<!DOCTYPE html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>QR Login - AionUI</title>
+  <title>QR Login - Jada Cowork</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f5f5f5; }
     .container { text-align: center; padding: 40px; background: white; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 400px; }
@@ -430,6 +431,192 @@ export function registerAuthRoutes(app: Express): void {
   app.get('/qr-login', (_req: Request, res: Response) => {
     res.send(QR_LOGIN_PAGE_HTML);
   });
+
+  // ─── Nextcloud OAuth2 SSO ───────────────────────────────────────────
+  // Env vars: NEXTCLOUD_SSO_URL, NEXTCLOUD_SSO_CLIENT_ID, NEXTCLOUD_SSO_CLIENT_SECRET
+  // Flow: iframe loads /api/auth/nextcloud-sso → redirects to Nextcloud OAuth2 → callback → auto-login
+
+  /**
+   * Initiate Nextcloud OAuth2 SSO flow
+   * GET /api/auth/nextcloud-sso
+   */
+  app.get('/api/auth/nextcloud-sso', authRateLimiter, (req: Request, res: Response) => {
+    const ncUrlRaw = process.env.NEXTCLOUD_SSO_URL;
+    const clientId = process.env.NEXTCLOUD_SSO_CLIENT_ID;
+
+    if (!ncUrlRaw || !clientId) {
+      // Redirect back to login instead of returning JSON — prevents raw JSON
+      // being displayed when SSO is not configured (e.g. iframe embed without SSO env vars)
+      res.redirect('/#/login?sso_unavailable=1');
+      return;
+    }
+
+    const baseUrl = (process.env.SERVER_BASE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+    const redirectUri = `${baseUrl}/api/auth/nextcloud-callback`;
+
+    // Generate a random state parameter to prevent CSRF
+    const state = crypto.randomBytes(16).toString('hex');
+
+    // Store state in a short-lived cookie for verification on callback.
+    // getCookieOptions() returns 'none' in iframe mode, 'lax' in remote HTTP,
+    // but 'strict' in remote HTTPS without iframe — which breaks OAuth redirects
+    // because browsers don't send SameSite=Strict cookies on cross-site navigations.
+    // Override: ensure at least 'lax' (needed for OAuth redirect), keep 'none' for iframe.
+    const cookieOpts = getCookieOptions();
+    const ssoCookieSameSite = cookieOpts.sameSite === 'none' ? 'none' : 'lax';
+    res.cookie('nc_sso_state', state, {
+      httpOnly: true,
+      ...cookieOpts,
+      sameSite: ssoCookieSameSite,
+      maxAge: 5 * 60 * 1000, // 5 minutes
+    });
+
+    // Normalize: strip trailing slash to prevent double-slash and preserve subpaths.
+    // Using string concatenation instead of new URL() because new URL('/path', base)
+    // drops any subpath from base (e.g. https://host/nextcloud → https://host/path).
+    const ncUrl = ncUrlRaw.replace(/\/+$/, '');
+
+    const authorizeUrl = `${ncUrl}/index.php/apps/oauth2/authorize`
+      + `?response_type=code`
+      + `&client_id=${encodeURIComponent(clientId)}`
+      + `&redirect_uri=${encodeURIComponent(redirectUri)}`
+      + `&state=${encodeURIComponent(state)}`;
+
+    res.redirect(authorizeUrl);
+  });
+
+  /**
+   * Nextcloud OAuth2 callback — exchange code for token, auto-login
+   * GET /api/auth/nextcloud-callback
+   */
+  app.get('/api/auth/nextcloud-callback', authRateLimiter, async (req: Request, res: Response) => {
+    const { code, state } = req.query;
+    const ncUrlRaw = process.env.NEXTCLOUD_SSO_URL;
+    const clientId = process.env.NEXTCLOUD_SSO_CLIENT_ID;
+    const clientSecret = process.env.NEXTCLOUD_SSO_CLIENT_SECRET;
+
+    if (!ncUrlRaw || !clientId || !clientSecret) {
+      res.redirect('/#/login?sso_error=not_configured');
+      return;
+    }
+
+    // Normalize: strip trailing slash to prevent double-slash in URL concatenation
+    const ncUrl = ncUrlRaw.replace(/\/+$/, '');
+
+    if (!code || !state) {
+      res.redirect('/#/login?sso_error=missing_params');
+      return;
+    }
+
+    // Verify state parameter matches the cookie
+    const storedState = req.cookies?.nc_sso_state;
+    if (!storedState || storedState !== state) {
+      console.error('[SSO] State mismatch: cookie=', storedState, 'query=', state);
+      res.redirect('/#/login?sso_error=state_mismatch');
+      return;
+    }
+    const clearCookieOpts = getCookieOptions();
+    const clearSameSite = clearCookieOpts.sameSite === 'none' ? 'none' : 'lax';
+    res.clearCookie('nc_sso_state', { httpOnly: true, ...clearCookieOpts, sameSite: clearSameSite });
+
+    try {
+      const baseUrl = (process.env.SERVER_BASE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+      const redirectUri = `${baseUrl}/api/auth/nextcloud-callback`;
+
+      console.log('[SSO] Exchanging code for token, redirect_uri:', redirectUri);
+
+      // Exchange authorization code for access token
+      const tokenResponse = await fetch(`${ncUrl}/index.php/apps/oauth2/api/v1/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          grant_type: 'authorization_code',
+          code: code as string,
+          redirect_uri: redirectUri,
+          client_id: clientId,
+          client_secret: clientSecret,
+        }),
+      });
+
+      if (!tokenResponse.ok) {
+        const errText = await tokenResponse.text();
+        console.error('[SSO] Token exchange failed:', tokenResponse.status, errText);
+        res.redirect('/#/login?sso_error=token_exchange_failed');
+        return;
+      }
+
+      const tokenData = (await tokenResponse.json()) as { access_token: string; user_id: string };
+      const ncUsername = tokenData.user_id;
+
+      if (!ncUsername) {
+        // Fallback: fetch user info from Nextcloud OCS API
+        const userInfoResponse = await fetch(`${ncUrl}/ocs/v2.php/cloud/user?format=json`, {
+          headers: {
+            Authorization: `Bearer ${tokenData.access_token}`,
+            'OCS-APIREQUEST': 'true',
+          },
+        });
+        if (!userInfoResponse.ok) {
+          console.error('[SSO] Failed to fetch user info:', userInfoResponse.status);
+          res.redirect('/#/login?sso_error=user_info_failed');
+          return;
+        }
+        const userInfo = (await userInfoResponse.json()) as { ocs: { data: { id: string; displayname: string } } };
+        const userId = userInfo.ocs?.data?.id;
+        if (!userId) {
+          console.error('[SSO] Could not determine Nextcloud user ID from response');
+          res.redirect('/#/login?sso_error=no_user_id');
+          return;
+        }
+        // Continue with userId as username
+        await handleSsoLogin(res, userId);
+        return;
+      }
+
+      await handleSsoLogin(res, ncUsername);
+    } catch (error) {
+      console.error('[SSO] Callback error:', error);
+      res.redirect('/#/login?sso_error=callback_failed');
+    }
+  });
+
+  /**
+   * Internal helper: find or create user and set session cookie
+   */
+  async function handleSsoLogin(res: Response, ncUsername: string): Promise<void> {
+    // Prefix SSO usernames to avoid collisions with local users
+    const localUsername = `nc_${ncUsername}`;
+
+    // Find or create the local user
+    let user = await UserRepository.findByUsername(localUsername);
+    if (!user) {
+      // Create a new user with a random password (SSO users don't use password login)
+      const randomPassword = AuthService.generateRandomPassword();
+      const passwordHash = await AuthService.hashPassword(randomPassword);
+      user = await UserRepository.createUser(localUsername, passwordHash);
+      console.log(`[SSO] Created local user for Nextcloud user: ${ncUsername} → ${localUsername}`);
+    }
+
+    // Update last login
+    await UserRepository.updateLastLogin(user.id);
+
+    // Generate JWT session token
+    const token = await AuthService.generateToken(user);
+
+    // Set session cookie — override SameSite to 'lax' for OAuth redirect flow.
+    // After Nextcloud redirects back, the first navigation is cross-site, so
+    // SameSite=Strict would cause the cookie to be dropped on that initial load.
+    const ssoLoginCookieOpts = getCookieOptions();
+    const ssoLoginSameSite = ssoLoginCookieOpts.sameSite === 'none' ? 'none' : 'lax';
+    res.cookie(AUTH_CONFIG.COOKIE.NAME, token, {
+      ...ssoLoginCookieOpts,
+      sameSite: ssoLoginSameSite,
+      maxAge: AUTH_CONFIG.TOKEN.COOKIE_MAX_AGE,
+    });
+
+    // Redirect to the main app
+    res.redirect('/');
+  }
 }
 
 export default registerAuthRoutes;
