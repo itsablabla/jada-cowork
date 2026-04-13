@@ -19,16 +19,12 @@ RUN node scripts/build-server.mjs
 
 # ---- Runtime image ----
 FROM oven/bun:latest AS runtime
-RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
-# Copy only build artifacts and production deps
+# Copy build artifacts and pre-built node_modules from builder
 COPY --from=builder /app/dist-server ./dist-server
 COPY --from=builder /app/out/renderer ./out/renderer
-COPY package.json bun.lock ./
-COPY patches/ patches/
-COPY scripts/postinstall.js scripts/postinstall.js
-RUN bun install --production
+COPY --from=builder /app/node_modules ./node_modules
 
 ENV PORT=3000
 ENV NODE_ENV=production
