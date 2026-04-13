@@ -18,16 +18,21 @@ openai = "${OPENAI_BASE_URL:-https://openrouter.ai/api/v1}"
 EOF
 fi
 
-# Kimi CLI: write config.toml with Moonshot API key
+# Kimi CLI: write config.toml with provider/model definitions
 if command -v kimi &>/dev/null && [ -n "$KIMI_API_KEY" ]; then
   mkdir -p /root/.kimi
   cat > /root/.kimi/config.toml <<EOF
-[model]
-provider = "moonshot"
-name = "kimi-latest"
+default_model = "kimi-latest"
 
-[model.api]
-key = "$KIMI_API_KEY"
+[providers.kimi]
+type = "kimi"
+base_url = "https://api.moonshot.cn/v1"
+api_key = "$KIMI_API_KEY"
+
+[models.kimi-latest]
+provider = "kimi"
+model = "kimi-latest"
+max_context_size = 131072
 EOF
 fi
 
