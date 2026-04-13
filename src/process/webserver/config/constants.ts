@@ -196,9 +196,8 @@ export const SECURITY_CONFIG = {
     TOKEN_LENGTH: 32,
     COOKIE_OPTIONS: {
       httpOnly: false,
-      // Iframe embedding requires SameSite=None + Secure for CSRF tokens too
-      sameSite: (process.env.AIONUI_FRAME_ANCESTORS ? 'none' : 'strict') as 'strict' | 'none',
-      secure: !!process.env.AIONUI_FRAME_ANCESTORS,
+      sameSite: 'strict' as const,
+      secure: false,
       path: '/',
     },
   },

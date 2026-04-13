@@ -77,6 +77,20 @@ export const authenticatedActionLimiter = rateLimit({
  * tiny-csrf 提供 req.csrfToken() 方法来生成 token
  */
 export function attachCsrfToken(req: Request, res: Response, next: NextFunction): void {
+  // When iframe embedding is enabled, intercept res.cookie to override tiny-csrf's
+  // hardcoded SameSite=Strict with SameSite=None + Secure (required for cross-origin iframes)
+  const frameAncestors = process.env.AIONUI_FRAME_ANCESTORS;
+  if (frameAncestors) {
+    const originalCookie = res.cookie.bind(res);
+    res.cookie = function (name: string, val: unknown, options?: Record<string, unknown>) {
+      if (name === 'csrfToken' && options) {
+        options.sameSite = 'none';
+        options.secure = true;
+      }
+      return originalCookie(name, val, options);
+    } as typeof res.cookie;
+  }
+
   // tiny-csrf provides req.csrfToken() method
   if (typeof req.csrfToken === 'function') {
     const token = req.csrfToken();
