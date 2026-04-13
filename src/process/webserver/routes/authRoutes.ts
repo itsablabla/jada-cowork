@@ -462,6 +462,7 @@ export function registerAuthRoutes(app: Express): void {
     res.cookie('nc_sso_state', state, {
       httpOnly: true,
       ...getCookieOptions(),
+      sameSite: 'lax', // Must be 'lax' (not 'strict') for cross-site OAuth2 redirect
       maxAge: 5 * 60 * 1000, // 5 minutes
     });
 

@@ -13,6 +13,7 @@ import { Layout as ArcoLayout } from '@arco-design/web-react';
 import { MenuFold, MenuUnfold } from '@icon-park/react';
 import classNames from 'classnames';
 import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutContext } from '@renderer/hooks/context/LayoutContext';
 import { NavigationHistoryProvider } from '@renderer/hooks/context/NavigationHistoryContext';
@@ -86,6 +87,7 @@ const Layout: React.FC<{
   sider: React.ReactNode;
   onSessionClick?: () => void;
 }> = ({ sider, onSessionClick: _onSessionClick }) => {
+  const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [viewportWidth, setViewportWidth] = useState<number>(() =>
@@ -476,7 +478,7 @@ const Layout: React.FC<{
                     ></path>
                   </svg>
                 </div>
-                <div className='flex-1 text-20px text-1 collapsed-hidden font-bold'>{process.env.AIONUI_APP_NAME || 'Jada Cowork'}</div>
+                <div className='flex-1 text-20px text-1 collapsed-hidden font-bold'>{t('login.brand')}</div>
                 {isMobile && !collapsed && (
                   <button
                     type='button'
