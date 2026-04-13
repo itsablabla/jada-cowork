@@ -441,10 +441,10 @@ export function registerAuthRoutes(app: Express): void {
    * GET /api/auth/nextcloud-sso
    */
   app.get('/api/auth/nextcloud-sso', authRateLimiter, (req: Request, res: Response) => {
-    const ncUrl = process.env.NEXTCLOUD_SSO_URL;
+    const ncUrlRaw = process.env.NEXTCLOUD_SSO_URL;
     const clientId = process.env.NEXTCLOUD_SSO_CLIENT_ID;
 
-    if (!ncUrl || !clientId) {
+    if (!ncUrlRaw || !clientId) {
       // Redirect back to login instead of returning JSON — prevents raw JSON
       // being displayed when SSO is not configured (e.g. iframe embed without SSO env vars)
       res.redirect('/#/login?sso_unavailable=1');
@@ -468,13 +468,18 @@ export function registerAuthRoutes(app: Express): void {
       maxAge: 5 * 60 * 1000, // 5 minutes
     });
 
-    const authorizeUrl = new URL('/index.php/apps/oauth2/authorize', ncUrl);
-    authorizeUrl.searchParams.set('response_type', 'code');
-    authorizeUrl.searchParams.set('client_id', clientId);
-    authorizeUrl.searchParams.set('redirect_uri', redirectUri);
-    authorizeUrl.searchParams.set('state', state);
+    // Normalize: strip trailing slash to prevent double-slash and preserve subpaths.
+    // Using string concatenation instead of new URL() because new URL('/path', base)
+    // drops any subpath from base (e.g. https://host/nextcloud → https://host/path).
+    const ncUrl = ncUrlRaw.replace(/\/+$/, '');
 
-    res.redirect(authorizeUrl.toString());
+    const authorizeUrl = `${ncUrl}/index.php/apps/oauth2/authorize`
+      + `?response_type=code`
+      + `&client_id=${encodeURIComponent(clientId)}`
+      + `&redirect_uri=${encodeURIComponent(redirectUri)}`
+      + `&state=${encodeURIComponent(state)}`;
+
+    res.redirect(authorizeUrl);
   });
 
   /**
