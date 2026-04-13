@@ -98,6 +98,38 @@ fi
 # Remove any stale config that might conflict
 rm -f /root/.config/opencode/config.json 2>/dev/null || true
 
+# Gemini CLI: configure MCP servers via settings.json
+if command -v gemini &>/dev/null && [ -n "$GEMINI_API_KEY" ]; then
+  mkdir -p /root/.gemini
+  # Build MCP servers config dynamically
+  MCP_JSON="{"
+  MCP_FIRST=true
+
+  if [ -n "$COMPOSIO_API_KEY" ]; then
+    MCP_JSON="${MCP_JSON}\"composio\":{\"url\":\"https://connect.composio.dev/mcp\",\"headers\":{\"x-consumer-api-key\":\"$COMPOSIO_API_KEY\"}}"
+    MCP_FIRST=false
+  fi
+
+  if [ -n "$GARZA_MCP_TOKEN" ]; then
+    [ "$MCP_FIRST" = false ] && MCP_JSON="${MCP_JSON},"
+    MCP_JSON="${MCP_JSON}\"garza\":{\"url\":\"https://mcp.garzaos.cloud/sse\",\"headers\":{\"Authorization\":\"Bearer $GARZA_MCP_TOKEN\"}}"
+    MCP_FIRST=false
+  fi
+
+  if [ -n "$NEXTCLOUD_MCP_TOKEN" ]; then
+    [ "$MCP_FIRST" = false ] && MCP_JSON="${MCP_JSON},"
+    MCP_JSON="${MCP_JSON}\"nextcloud\":{\"url\":\"${NEXTCLOUD_MCP_URL:-https://mcp-next.garzaos.online/mcp}\",\"headers\":{\"Authorization\":\"Bearer $NEXTCLOUD_MCP_TOKEN\"}}"
+  fi
+
+  MCP_JSON="${MCP_JSON}}"
+
+  cat > /root/.gemini/settings.json <<EOF
+{
+  "mcpServers": $MCP_JSON
+}
+EOF
+fi
+
 echo "[entrypoint] CLI agent auth + MCP servers configured"
 
 # Start the server
