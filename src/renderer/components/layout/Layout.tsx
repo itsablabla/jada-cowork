@@ -476,7 +476,7 @@ const Layout: React.FC<{
                     ></path>
                   </svg>
                 </div>
-                <div className='flex-1 text-20px text-1 collapsed-hidden font-bold'>AionUi</div>
+                <div className='flex-1 text-20px text-1 collapsed-hidden font-bold'>{process.env.AIONUI_APP_NAME || 'Jada Cowork'}</div>
                 {isMobile && !collapsed && (
                   <button
                     type='button'
