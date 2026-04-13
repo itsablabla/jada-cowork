@@ -603,9 +603,14 @@ export function registerAuthRoutes(app: Express): void {
     // Generate JWT session token
     const token = await AuthService.generateToken(user);
 
-    // Set session cookie
+    // Set session cookie — override SameSite to 'lax' for OAuth redirect flow.
+    // After Nextcloud redirects back, the first navigation is cross-site, so
+    // SameSite=Strict would cause the cookie to be dropped on that initial load.
+    const ssoLoginCookieOpts = getCookieOptions();
+    const ssoLoginSameSite = ssoLoginCookieOpts.sameSite === 'none' ? 'none' : 'lax';
     res.cookie(AUTH_CONFIG.COOKIE.NAME, token, {
-      ...getCookieOptions(),
+      ...ssoLoginCookieOpts,
+      sameSite: ssoLoginSameSite,
       maxAge: AUTH_CONFIG.TOKEN.COOKIE_MAX_AGE,
     });
 

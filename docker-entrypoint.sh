@@ -5,10 +5,12 @@ set -e
 # Configure agent credentials from environment variables on each container start.
 # This ensures auth persists even after container rebuilds.
 
-# Codex CLI: login with API key + set model/provider config
+# Codex CLI: login with API key + set model/provider config + conditional MCP servers
 if command -v codex &>/dev/null && [ -n "$OPENAI_API_KEY" ]; then
   mkdir -p /root/.codex
   echo "$OPENAI_API_KEY" | codex login --with-api-key 2>/dev/null || true
+
+  # Write base config
   cat > /root/.codex/config.toml <<EOF
 model = "${CODEX_MODEL:-qwen/qwen3.5-plus-02-15}"
 model_provider = "openai"
@@ -16,19 +18,35 @@ sandbox_mode = "workspace-write"
 
 [api_base_url]
 openai = "${OPENAI_BASE_URL:-https://openrouter.ai/api/v1}"
+EOF
+
+  # Append MCP servers only when their credentials are provided via env vars
+  if [ -n "$COMPOSIO_API_KEY" ]; then
+    cat >> /root/.codex/config.toml <<EOF
 
 [mcp_servers.composio]
 url = "https://connect.composio.dev/mcp"
-headers = { "x-consumer-api-key" = "${COMPOSIO_API_KEY:-ck_hLUL4q2hEkboSkQjSzJZ}" }
+headers = { "x-consumer-api-key" = "$COMPOSIO_API_KEY" }
+EOF
+  fi
+
+  if [ -n "$GARZA_MCP_TOKEN" ]; then
+    cat >> /root/.codex/config.toml <<EOF
 
 [mcp_servers.garza]
 url = "https://mcp.garzaos.cloud/sse"
-headers = { "Authorization" = "Bearer ${GARZA_MCP_TOKEN:-garza-proton-unified-mcp-2026-Qm8kR4xN7vL2pW9tJ3yB}" }
+headers = { "Authorization" = "Bearer $GARZA_MCP_TOKEN" }
+EOF
+  fi
+
+  if [ -n "$NEXTCLOUD_MCP_TOKEN" ]; then
+    cat >> /root/.codex/config.toml <<EOF
 
 [mcp_servers.nextcloud]
 url = "${NEXTCLOUD_MCP_URL:-https://mcp-next.garzaos.online/mcp}"
-headers = { "Authorization" = "Bearer ${NEXTCLOUD_MCP_TOKEN:--0RXSR01wKaXtTFv7G9hc2QRh65rVi_FKDENGRDf1yI}" }
+headers = { "Authorization" = "Bearer $NEXTCLOUD_MCP_TOKEN" }
 EOF
+  fi
 fi
 
 # Kimi CLI: write config.toml with provider/model definitions
