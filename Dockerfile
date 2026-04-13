@@ -27,6 +27,7 @@ COPY --from=builder /app/dist-server ./dist-server
 COPY --from=builder /app/out/renderer ./out/renderer
 COPY package.json bun.lock ./
 COPY patches/ patches/
+COPY scripts/postinstall.js scripts/postinstall.js
 RUN bun install --production
 
 ENV PORT=3000
