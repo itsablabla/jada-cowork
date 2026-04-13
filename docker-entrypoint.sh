@@ -1,0 +1,68 @@
+#!/bin/bash
+set -e
+
+# === CLI Agent Auth Setup ===
+# Configure agent credentials from environment variables on each container start.
+# This ensures auth persists even after container rebuilds.
+
+# Codex CLI: login with API key + set model/provider config
+if command -v codex &>/dev/null && [ -n "$OPENAI_API_KEY" ]; then
+  mkdir -p /root/.codex
+  echo "$OPENAI_API_KEY" | codex login --with-api-key 2>/dev/null || true
+  cat > /root/.codex/config.toml <<EOF
+model = "${CODEX_MODEL:-qwen/qwen3.5-plus-02-15}"
+model_provider = "openai"
+
+[api_base_url]
+openai = "${OPENAI_BASE_URL:-https://openrouter.ai/api/v1}"
+EOF
+fi
+
+# Kimi CLI: write config.toml with Moonshot API key
+if command -v kimi &>/dev/null && [ -n "$KIMI_API_KEY" ]; then
+  mkdir -p /root/.kimi
+  cat > /root/.kimi/config.toml <<EOF
+[model]
+provider = moonshot
+name = kimi-latest
+
+[model.api]
+key = $KIMI_API_KEY
+EOF
+fi
+
+# Qwen Code CLI: write settings.json with OpenRouter provider
+if command -v qwen &>/dev/null && [ -n "$OPENROUTER_API_KEY" ]; then
+  mkdir -p /root/.qwen
+  cat > /root/.qwen/settings.json <<EOF
+{
+  "modelProviders": {
+    "openai": [
+      {
+        "id": "${QWEN_MODEL:-qwen/qwen3-235b-a22b}",
+        "envKey": "OPENROUTER_API_KEY",
+        "baseUrl": "https://openrouter.ai/api/v1"
+      }
+    ]
+  },
+  "security": {
+    "auth": {
+      "selectedType": "openai"
+    }
+  },
+  "model": {
+    "name": "${QWEN_MODEL:-qwen/qwen3-235b-a22b}"
+  },
+  "\$version": 3
+}
+EOF
+fi
+
+# OpenCode: uses OPENAI_API_KEY + OPENAI_BASE_URL env vars directly (no config needed)
+# Remove any stale config that might conflict
+rm -f /root/.config/opencode/config.json 2>/dev/null || true
+
+echo "[entrypoint] CLI agent auth configured"
+
+# Start the server
+exec bun dist-server/server.mjs

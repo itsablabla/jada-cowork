@@ -51,6 +51,10 @@ COPY --from=builder /app/dist-server ./dist-server
 COPY --from=builder /app/out/renderer ./out/renderer
 COPY --from=builder /app/node_modules ./node_modules
 
+# Entrypoint script configures CLI agent auth from env vars on each start
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
+
 ENV PORT=3000
 ENV NODE_ENV=production
 ENV ALLOW_REMOTE=true
@@ -60,4 +64,4 @@ ENV DATA_DIR=/data
 VOLUME ["/data"]
 EXPOSE 3000
 
-CMD ["bun", "dist-server/server.mjs"]
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
