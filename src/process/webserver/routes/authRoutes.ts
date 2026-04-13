@@ -483,14 +483,17 @@ export function registerAuthRoutes(app: Express): void {
    */
   app.get('/api/auth/nextcloud-callback', authRateLimiter, async (req: Request, res: Response) => {
     const { code, state } = req.query;
-    const ncUrl = process.env.NEXTCLOUD_SSO_URL;
+    const ncUrlRaw = process.env.NEXTCLOUD_SSO_URL;
     const clientId = process.env.NEXTCLOUD_SSO_CLIENT_ID;
     const clientSecret = process.env.NEXTCLOUD_SSO_CLIENT_SECRET;
 
-    if (!ncUrl || !clientId || !clientSecret) {
+    if (!ncUrlRaw || !clientId || !clientSecret) {
       res.redirect('/#/login?sso_error=not_configured');
       return;
     }
+
+    // Normalize: strip trailing slash to prevent double-slash in URL concatenation
+    const ncUrl = ncUrlRaw.replace(/\/+$/, '');
 
     if (!code || !state) {
       res.redirect('/#/login?sso_error=missing_params');

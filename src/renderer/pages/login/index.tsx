@@ -47,9 +47,13 @@ const LoginPage: React.FC = () => {
   const passwordRef = useRef<HTMLInputElement | null>(null);
   const messageTimer = useRef<number | undefined>(undefined);
 
+  // Module-level guard: survives within the same SPA session even when
+  // sessionStorage is blocked (e.g. cross-origin iframes with Safari ITP).
+  const ssoAttemptedRef = useRef(false);
+
   // Auto-redirect to Nextcloud SSO when loaded inside an iframe
   useEffect(() => {
-    // If the server indicated SSO is not configured, don't attempt redirect
+    // If the server indicated SSO is not configured or a previous attempt failed, stop
     const params = new URLSearchParams(window.location.hash.split('?')[1] || '');
     if (params.get('sso_unavailable') === '1' || params.has('sso_error')) {
       return;
@@ -63,7 +67,13 @@ const LoginPage: React.FC = () => {
       isInIframe = true;
     }
     if (isInIframe && status === 'unauthenticated') {
-      // Prevent redirect loop: only redirect if we haven't tried SSO recently
+      // Secondary guard: if we already attempted SSO in this SPA lifecycle, don't retry.
+      // This covers environments where sessionStorage is blocked entirely.
+      if (ssoAttemptedRef.current) {
+        return;
+      }
+
+      // Primary guard: sessionStorage-based cooldown (30s)
       const ssoAttemptKey = '__jada_sso_attempted';
       let lastAttempt: string | null = null;
       try {
@@ -73,10 +83,11 @@ const LoginPage: React.FC = () => {
       }
       const now = Date.now();
       if (!lastAttempt || now - Number(lastAttempt) > 30000) {
+        ssoAttemptedRef.current = true;
         try {
           sessionStorage.setItem(ssoAttemptKey, String(now));
         } catch {
-          // Proceed with redirect even if storage is blocked
+          // Proceed with redirect even if storage is blocked — ref guard prevents loops
         }
         window.location.href = '/api/auth/nextcloud-sso';
         return;
