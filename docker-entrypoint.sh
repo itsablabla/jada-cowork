@@ -23,11 +23,11 @@ if command -v kimi &>/dev/null && [ -n "$KIMI_API_KEY" ]; then
   mkdir -p /root/.kimi
   cat > /root/.kimi/config.toml <<EOF
 [model]
-provider = moonshot
-name = kimi-latest
+provider = "moonshot"
+name = "kimi-latest"
 
 [model.api]
-key = $KIMI_API_KEY
+key = "$KIMI_API_KEY"
 EOF
 fi
 
