@@ -504,7 +504,7 @@ export function registerAuthRoutes(app: Express): void {
       res.redirect('/#/login?sso_error=state_mismatch');
       return;
     }
-    res.clearCookie('nc_sso_state');
+    res.clearCookie('nc_sso_state', { httpOnly: true, ...getCookieOptions() });
 
     try {
       const baseUrl = process.env.SERVER_BASE_URL || `${req.protocol}://${req.get('host')}`;
