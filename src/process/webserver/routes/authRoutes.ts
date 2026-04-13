@@ -440,7 +440,7 @@ export function registerAuthRoutes(app: Express): void {
    * Initiate Nextcloud OAuth2 SSO flow
    * GET /api/auth/nextcloud-sso
    */
-  app.get('/api/auth/nextcloud-sso', (_req: Request, res: Response) => {
+  app.get('/api/auth/nextcloud-sso', authRateLimiter, (_req: Request, res: Response) => {
     const ncUrl = process.env.NEXTCLOUD_SSO_URL;
     const clientId = process.env.NEXTCLOUD_SSO_CLIENT_ID;
 
@@ -461,8 +461,7 @@ export function registerAuthRoutes(app: Express): void {
     // Store state in a short-lived cookie for verification on callback
     res.cookie('nc_sso_state', state, {
       httpOnly: true,
-      secure: true,
-      sameSite: 'lax',
+      ...getCookieOptions(),
       maxAge: 5 * 60 * 1000, // 5 minutes
     });
 
@@ -479,7 +478,7 @@ export function registerAuthRoutes(app: Express): void {
    * Nextcloud OAuth2 callback — exchange code for token, auto-login
    * GET /api/auth/nextcloud-callback
    */
-  app.get('/api/auth/nextcloud-callback', async (req: Request, res: Response) => {
+  app.get('/api/auth/nextcloud-callback', authRateLimiter, async (req: Request, res: Response) => {
     const { code, state } = req.query;
     const ncUrl = process.env.NEXTCLOUD_SSO_URL;
     const clientId = process.env.NEXTCLOUD_SSO_CLIENT_ID;
