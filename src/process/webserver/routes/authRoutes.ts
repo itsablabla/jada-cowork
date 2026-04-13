@@ -440,7 +440,7 @@ export function registerAuthRoutes(app: Express): void {
    * Initiate Nextcloud OAuth2 SSO flow
    * GET /api/auth/nextcloud-sso
    */
-  app.get('/api/auth/nextcloud-sso', authRateLimiter, (_req: Request, res: Response) => {
+  app.get('/api/auth/nextcloud-sso', authRateLimiter, (req: Request, res: Response) => {
     const ncUrl = process.env.NEXTCLOUD_SSO_URL;
     const clientId = process.env.NEXTCLOUD_SSO_CLIENT_ID;
 
@@ -451,7 +451,7 @@ export function registerAuthRoutes(app: Express): void {
       return;
     }
 
-    const baseUrl = process.env.SERVER_BASE_URL || `${_req.protocol}://${_req.get('host')}`;
+    const baseUrl = process.env.SERVER_BASE_URL || `${req.protocol}://${req.get('host')}`;
     const redirectUri = `${baseUrl}/api/auth/nextcloud-callback`;
 
     // Generate a random state parameter to prevent CSRF

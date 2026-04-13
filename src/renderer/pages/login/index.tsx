@@ -65,10 +65,19 @@ const LoginPage: React.FC = () => {
     if (isInIframe && status === 'unauthenticated') {
       // Prevent redirect loop: only redirect if we haven't tried SSO recently
       const ssoAttemptKey = '__jada_sso_attempted';
-      const lastAttempt = sessionStorage.getItem(ssoAttemptKey);
+      let lastAttempt: string | null = null;
+      try {
+        lastAttempt = sessionStorage.getItem(ssoAttemptKey);
+      } catch {
+        // sessionStorage may be blocked in cross-origin iframes (e.g. Safari ITP)
+      }
       const now = Date.now();
       if (!lastAttempt || now - Number(lastAttempt) > 30000) {
-        sessionStorage.setItem(ssoAttemptKey, String(now));
+        try {
+          sessionStorage.setItem(ssoAttemptKey, String(now));
+        } catch {
+          // Proceed with redirect even if storage is blocked
+        }
         window.location.href = '/api/auth/nextcloud-sso';
         return;
       }
