@@ -445,10 +445,9 @@ export function registerAuthRoutes(app: Express): void {
     const clientId = process.env.NEXTCLOUD_SSO_CLIENT_ID;
 
     if (!ncUrl || !clientId) {
-      res.status(501).json({
-        success: false,
-        error: 'Nextcloud SSO not configured. Set NEXTCLOUD_SSO_URL and NEXTCLOUD_SSO_CLIENT_ID.',
-      });
+      // Redirect back to login instead of returning JSON — prevents raw JSON
+      // being displayed when SSO is not configured (e.g. iframe embed without SSO env vars)
+      res.redirect('/#/login?sso_unavailable=1');
       return;
     }
 

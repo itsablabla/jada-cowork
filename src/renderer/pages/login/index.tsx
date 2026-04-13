@@ -49,6 +49,12 @@ const LoginPage: React.FC = () => {
 
   // Auto-redirect to Nextcloud SSO when loaded inside an iframe
   useEffect(() => {
+    // If the server indicated SSO is not configured, don't attempt redirect
+    const params = new URLSearchParams(window.location.hash.split('?')[1] || '');
+    if (params.get('sso_unavailable') === '1') {
+      return;
+    }
+
     let isInIframe = false;
     try {
       isInIframe = window.self !== window.top;
