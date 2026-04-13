@@ -5,7 +5,9 @@ WORKDIR /app
 RUN npm install -g bun
 
 # Install all dependencies (including devDeps for build)
-COPY package.json bun.lockb ./
+COPY package.json bun.lock ./
+COPY patches/ patches/
+COPY scripts/postinstall.js scripts/postinstall.js
 RUN bun install
 
 # Copy source
@@ -19,11 +21,10 @@ RUN node scripts/build-server.mjs
 FROM oven/bun:latest AS runtime
 WORKDIR /app
 
-# Copy only build artifacts and production deps
+# Copy build artifacts and pre-built node_modules from builder
 COPY --from=builder /app/dist-server ./dist-server
 COPY --from=builder /app/out/renderer ./out/renderer
-COPY package.json bun.lockb ./
-RUN bun install --production
+COPY --from=builder /app/node_modules ./node_modules
 
 ENV PORT=3000
 ENV NODE_ENV=production

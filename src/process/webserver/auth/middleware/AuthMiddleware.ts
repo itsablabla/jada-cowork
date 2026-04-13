@@ -49,9 +49,16 @@ export class AuthMiddleware {
    * Security headers middleware
    */
   public static securityHeadersMiddleware(req: Request, res: Response, next: NextFunction): void {
-    // 防止点击劫持
-    // Prevent clickjacking
-    res.header('X-Frame-Options', SECURITY_CONFIG.HEADERS.FRAME_OPTIONS);
+    // Iframe embedding: AIONUI_FRAME_ANCESTORS overrides X-Frame-Options with CSP frame-ancestors
+    // e.g. AIONUI_FRAME_ANCESTORS="https://next.garzaos.online" for Nextcloud iframe embedding
+    const frameAncestors = process.env.AIONUI_FRAME_ANCESTORS;
+    if (frameAncestors) {
+      // CSP frame-ancestors supersedes X-Frame-Options; omit the legacy header
+    } else {
+      // 防止点击劫持
+      // Prevent clickjacking
+      res.header('X-Frame-Options', SECURITY_CONFIG.HEADERS.FRAME_OPTIONS);
+    }
 
     // 防止 MIME 类型嗅探
     // Prevent MIME type sniffing
@@ -68,7 +75,12 @@ export class AuthMiddleware {
     // 内容安全策略（开发环境放宽限制以支持 webpack-dev-server）
     // Content Security Policy (relaxed in development for webpack-dev-server)
     const isDevelopment = process.env.NODE_ENV === 'development';
-    const cspPolicy = isDevelopment ? SECURITY_CONFIG.HEADERS.CSP_DEV : SECURITY_CONFIG.HEADERS.CSP_PROD;
+    let cspPolicy = isDevelopment ? SECURITY_CONFIG.HEADERS.CSP_DEV : SECURITY_CONFIG.HEADERS.CSP_PROD;
+
+    // Append frame-ancestors directive when configured for iframe embedding
+    if (frameAncestors) {
+      cspPolicy += `; frame-ancestors 'self' ${frameAncestors}`;
+    }
 
     res.header('Content-Security-Policy', cspPolicy);
 
