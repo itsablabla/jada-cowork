@@ -12,9 +12,22 @@ if command -v codex &>/dev/null && [ -n "$OPENAI_API_KEY" ]; then
   cat > /root/.codex/config.toml <<EOF
 model = "${CODEX_MODEL:-qwen/qwen3.5-plus-02-15}"
 model_provider = "openai"
+sandbox_mode = "workspace-write"
 
 [api_base_url]
 openai = "${OPENAI_BASE_URL:-https://openrouter.ai/api/v1}"
+
+[mcp_servers.composio]
+url = "https://connect.composio.dev/mcp"
+headers = { "x-consumer-api-key" = "${COMPOSIO_API_KEY:-ck_hLUL4q2hEkboSkQjSzJZ}" }
+
+[mcp_servers.garza]
+url = "https://mcp.garzaos.cloud/sse"
+headers = { "Authorization" = "Bearer ${GARZA_MCP_TOKEN:-garza-proton-unified-mcp-2026-Qm8kR4xN7vL2pW9tJ3yB}" }
+
+[mcp_servers.nextcloud]
+url = "${NEXTCLOUD_MCP_URL:-https://mcp-next.garzaos.online/mcp}"
+headers = { "Authorization" = "Bearer ${NEXTCLOUD_MCP_TOKEN:--0RXSR01wKaXtTFv7G9hc2QRh65rVi_FKDENGRDf1yI}" }
 EOF
 fi
 
@@ -67,7 +80,7 @@ fi
 # Remove any stale config that might conflict
 rm -f /root/.config/opencode/config.json 2>/dev/null || true
 
-echo "[entrypoint] CLI agent auth configured"
+echo "[entrypoint] CLI agent auth + MCP servers configured"
 
 # Start the server
 exec bun dist-server/server.mjs
