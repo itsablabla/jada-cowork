@@ -485,19 +485,20 @@ export function registerAuthRoutes(app: Express): void {
     const clientSecret = process.env.NEXTCLOUD_SSO_CLIENT_SECRET;
 
     if (!ncUrl || !clientId || !clientSecret) {
-      res.status(501).json({ success: false, error: 'Nextcloud SSO not configured' });
+      res.redirect('/#/login?sso_error=not_configured');
       return;
     }
 
     if (!code || !state) {
-      res.status(400).json({ success: false, error: 'Missing code or state parameter' });
+      res.redirect('/#/login?sso_error=missing_params');
       return;
     }
 
     // Verify state parameter matches the cookie
     const storedState = req.cookies?.nc_sso_state;
     if (!storedState || storedState !== state) {
-      res.status(403).json({ success: false, error: 'Invalid state parameter (CSRF protection)' });
+      console.error('[SSO] State mismatch: cookie=', storedState, 'query=', state);
+      res.redirect('/#/login?sso_error=state_mismatch');
       return;
     }
     res.clearCookie('nc_sso_state');
@@ -505,6 +506,8 @@ export function registerAuthRoutes(app: Express): void {
     try {
       const baseUrl = process.env.SERVER_BASE_URL || `${req.protocol}://${req.get('host')}`;
       const redirectUri = `${baseUrl}/api/auth/nextcloud-callback`;
+
+      console.log('[SSO] Exchanging code for token, redirect_uri:', redirectUri);
 
       // Exchange authorization code for access token
       const tokenResponse = await fetch(`${ncUrl}/index.php/apps/oauth2/api/v1/token`, {
@@ -522,7 +525,7 @@ export function registerAuthRoutes(app: Express): void {
       if (!tokenResponse.ok) {
         const errText = await tokenResponse.text();
         console.error('[SSO] Token exchange failed:', tokenResponse.status, errText);
-        res.status(502).json({ success: false, error: 'Token exchange failed' });
+        res.redirect('/#/login?sso_error=token_exchange_failed');
         return;
       }
 
@@ -538,13 +541,15 @@ export function registerAuthRoutes(app: Express): void {
           },
         });
         if (!userInfoResponse.ok) {
-          res.status(502).json({ success: false, error: 'Failed to fetch user info from Nextcloud' });
+          console.error('[SSO] Failed to fetch user info:', userInfoResponse.status);
+          res.redirect('/#/login?sso_error=user_info_failed');
           return;
         }
         const userInfo = (await userInfoResponse.json()) as { ocs: { data: { id: string; displayname: string } } };
         const userId = userInfo.ocs?.data?.id;
         if (!userId) {
-          res.status(502).json({ success: false, error: 'Could not determine Nextcloud user ID' });
+          console.error('[SSO] Could not determine Nextcloud user ID from response');
+          res.redirect('/#/login?sso_error=no_user_id');
           return;
         }
         // Continue with userId as username
@@ -555,7 +560,7 @@ export function registerAuthRoutes(app: Express): void {
       await handleSsoLogin(res, ncUsername);
     } catch (error) {
       console.error('[SSO] Callback error:', error);
-      res.status(500).json({ success: false, error: 'SSO callback failed' });
+      res.redirect('/#/login?sso_error=callback_failed');
     }
   });
 
