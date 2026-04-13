@@ -51,7 +51,7 @@ const LoginPage: React.FC = () => {
   useEffect(() => {
     // If the server indicated SSO is not configured, don't attempt redirect
     const params = new URLSearchParams(window.location.hash.split('?')[1] || '');
-    if (params.get('sso_unavailable') === '1') {
+    if (params.get('sso_unavailable') === '1' || params.has('sso_error')) {
       return;
     }
 
