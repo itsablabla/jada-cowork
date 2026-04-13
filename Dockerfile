@@ -25,6 +25,7 @@ WORKDIR /app
 COPY --from=builder /app/dist-server ./dist-server
 COPY --from=builder /app/out/renderer ./out/renderer
 COPY package.json bun.lock ./
+COPY patches/ patches/
 RUN bun install --production
 
 ENV PORT=3000
