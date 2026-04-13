@@ -5,7 +5,7 @@ WORKDIR /app
 RUN npm install -g bun
 
 # Install all dependencies (including devDeps for build)
-COPY package.json bun.lockb ./
+COPY package.json bun.lock ./
 RUN bun install
 
 # Copy source
@@ -22,7 +22,7 @@ WORKDIR /app
 # Copy only build artifacts and production deps
 COPY --from=builder /app/dist-server ./dist-server
 COPY --from=builder /app/out/renderer ./out/renderer
-COPY package.json bun.lockb ./
+COPY package.json bun.lock ./
 RUN bun install --production
 
 ENV PORT=3000
