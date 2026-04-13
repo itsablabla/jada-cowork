@@ -35,6 +35,8 @@ RUN npm install -g @anthropic-ai/qwen-code@latest 2>/dev/null || \
     npm install -g @qwen-code/qwen-code@latest 2>/dev/null || true
 # OpenCode (Go binary)
 RUN curl -fsSL https://opencode.ai/install | bash 2>/dev/null || true
+# OpenAI Codex CLI (~200MB RAM, remote LLM calls via OpenRouter)
+RUN npm install -g @openai/codex@latest 2>/dev/null || true
 # Nano Bot is NOT ACP-compatible — intentionally excluded
 
 # Create Qwen wrapper to auto-inject --auth-type openai for ACP mode
